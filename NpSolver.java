@@ -98,13 +98,13 @@ public class NpSolver {
                 ida = random.nextInt(maxId) + minId;
                 idb = random.nextInt(maxId) + minId;
                 if (ida==idb) idb++;
-                if (ida>idb) {
-                    int tmp = idb;
-                    idb=ida;
-                    ida=tmp;
+                if (ida > idb) { //ida < idb only. Simplify duplicate checking
+                    int tmp=idb; idb=ida; ida=tmp;
                 }
                 op = random.nextInt(MAX_OP);
-            } while (
+            }
+            while (
+                //Duplicate ? retry 10x
                 nodes.values().stream().anyMatch(p->p.ida==ida && p.idb==idb && p.op==op)
                 && ++count < 10
             ); if (count > 9) throw new RuntimeException("WARNING CONFLIC i:"+curId+" count:"+count);
