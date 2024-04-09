@@ -4,22 +4,21 @@ import java.util.*;
 public class NpSolver {
     private static final int MAX_ID = 30;
     private static final int NB_INPUT = 3;
-    public static void main(String[] args) {
+    public static void main(String W[]) {
 
         List<InOut> map = new ArrayList<>();
         
         Map<Integer, Node> nodes = new HashMap<>();
-        for(int i=0; i<NB_INPUT; i++) nodes.put(i, new Node("IN", i));
+        for(int i=0; i<NB_INPUT; i++) nodes.put(i, new Node("INPUT", i));
         for(int i=NB_INPUT; i<MAX_ID; i++) nodes.put(i, new Node(nodes, i));
         //System.out.println("\n### NODES - nbNodes:" + nodes.size()); System.out.println(nodes);
 
-        
-
-        //Checking eval sys
+        //Verify eval system
         int eval, oldI=0;
         for (int i=-100; i<=100; i+=Math.abs(i/10)+1) {
             eval=Node.baseEval(i, i, i-oldI, i-oldI);
-            if (eval != 100) System.out.println("WARNING EVAL KO !!! - i:"+i+" ev:"+eval);
+            if (eval != 100) throw new RuntimeException("WARNING EVAL KO !!! - i:"+i+" ev:"+eval);
+            //System.out.println("i:"+i+" dt:"+(i-oldI)+" ev:"+eval);
             oldI = i;
         }
         
@@ -27,40 +26,23 @@ public class NpSolver {
         while (max < 99 && count++ < 1000) {
 
             map.clear();
-            for(int j=0; j<10000; j++) map.add(new InOut(NB_INPUT));
+            for(int j=0; j<1000; j++) map.add(new InOut(NB_INPUT));
             //System.out.println("\n### THE MAP - nbTest:" + map.size()); System.out.println(map);
             
             for(InOut io : map) nodes.forEach((k, v) -> v.compute(k, nodes, io));
             //System.out.println("\n### SIM > OUTS"); System.out.println(nodes);
             
-            nodes.forEach((k, v) -> v.evaluate(k, nodes, map));
+            nodes.forEach((k, v) -> v.evaluate(map));
             //System.out.println("\n### EVALUATE > EVALS"); System.out.println(nodes);
 
             nodes.forEach((k, v) -> v.backProp(nodes));
             System.out.println("\n### AVG EVALS & BACK PROPAGATION"); System.out.println(nodes);
 
             double min2=getMin(nodes); min = min2; max=getMax(nodes);
-            nodes.forEach((k, v) -> nodes.put(k, v.cleanUp(nodes, min2)));
+            nodes.forEach((k, v) -> nodes.put(k, v.cleanUp(k, nodes, min2)));
             System.out.println("\n### CLEAN UP - max:" + max + " min:" + min);// System.out.println(nodes);
         }
         System.out.println();
-    }
-
-    private static double getMin(Map<Integer, NpSolver.Node> nodes) {
-        double min=100;
-        for(Node n : nodes.values()) {
-            double cur = n.avgEval;
-            if (cur != 0.0 && cur < min) min = cur;
-        }
-        return min;
-    }
-    private static double getMax(Map<Integer, NpSolver.Node> nodes) {
-        double max=0;
-        for(Node n : nodes.values()) {
-            double cur = n.avgEval;
-            if (cur > max) max = cur;
-        }
-        return max;
     }
 
     // ***************************************************************************************************************************************************
@@ -73,10 +55,11 @@ public class NpSolver {
             in = new ArrayList<>();
             Random random = new Random();
             for(int i=nbInupt; i>0; i--) in.add(random.nextInt(100)-50);
+            
             //InputCode
-            if (in.get(0) > in.get(1)) out = in.get(0);
-            else out = in.get(1) + in.get(2);
-            //out = in.get(0) * in.get(1) * in.get(2);
+            int a=in.get(0), b=in.get(1), c=in.get(2);
+            if (a > b) out = a;
+            else out = b + c;
         }
         @Override
         public String toString() {
@@ -88,25 +71,26 @@ public class NpSolver {
     // ***************************************************************************************************************************************************
 
     static class Node {
-        private static final int MAX_OP = 6;
-        int id=-1, ida=-1, idb=-1, op, min, max, med;
+        private static final int MAX_OP = 7;
+        int ida, idb, op;
         double avgEval=0.0;
         List<Integer> outs;
         List<Integer> evals;
 
+        //New Input nodes
         public Node(String s, int curId) {
-            id = curId;
             op = MAX_OP;
-            min=Integer.MAX_VALUE;
-            max=Integer.MIN_VALUE;
             outs = new ArrayList<>();
             evals = new ArrayList<>();
         }
 
+        //New Compute node
         public Node(Map<Integer, Node> nodes, int curId) {
-            id = curId;
             Random random = new Random();
+            outs = new ArrayList<>();
+            evals = new ArrayList<>();
 
+            //Randomly choose ida, idb and operator
             int count=0;
             do {
                 int maxId = curId < 20 ? curId : 20;
@@ -121,33 +105,29 @@ public class NpSolver {
                 }
                 op = random.nextInt(MAX_OP);
             } while (
-                nodes.values().stream().filter(p->p.ida==ida && p.idb==idb && p.op==op)
-                .findFirst().isPresent() && count++ < 10
-            );
-            if (count > 8) System.out.println("WARNING CONFLIC i:"+curId+" count:"+count);
-
-            min=Integer.MAX_VALUE;
-            max=Integer.MIN_VALUE;
-            outs = new ArrayList<>();
-            evals = new ArrayList<>();
+                nodes.values().stream().anyMatch(p->p.ida==ida && p.idb==idb && p.op==op)
+                && ++count < 10
+            ); if (count > 9) throw new RuntimeException("WARNING CONFLIC i:"+curId+" count:"+count);
         }
 
         public void compute(int key, Map<Integer, Node> nodes, InOut io) {
             if (op == MAX_OP){
-                addToOuts(io.in.get(key));
+                outs.add(io.in.get(key));
             }
             else {
-                int a = nodes.get(ida).last(), b = nodes.get(idb).last();
-                if (op == 0) addToOuts(a + b);           //A+B
-                if (op == 1) addToOuts(a > b  ? a : 0);  //A > B ? A : 0
-                if (op == 2) addToOuts(a < b  ? a : 0);
-                if (op == 3) addToOuts(b == 0 ? a : b);  //Else
-                if (op == 4) addToOuts(a == 0 ? b : a);  //replace output
-                if (op == 5) addToOuts(a * b);  //replace output
+                int a = nodes.get(ida).lastOut(), b = nodes.get(idb).lastOut();
+                if (op == 0) outs.add(a + b);           //A+B
+                if (op == 1) outs.add(a > b  ? a : 0);  //Supp & Inf
+                if (op == 2) outs.add(a < b  ? a : 0);
+                if (op == 3) outs.add(b == 0 ? a : b);  //Replace 0 by
+                if (op == 4) outs.add(a == 0 ? b : a);  
+                if (op == 5) outs.add(a * b);  
+                if (op == 6) outs.add(a - b);
             }
         }
-        public void evaluate(int key, Map<Integer, Node> nodes, List<InOut> map) {
-            if (op != MAX_OP) {
+        
+        public void evaluate(List<InOut> map) {
+            if (isCompute()) {
                 int lout=0, lexp=0;
                 for (int i=0; i<outs.size(); i++) {
                     int out=outs.get(i);
@@ -177,92 +157,71 @@ public class NpSolver {
         }
 
         public void backProp(Map<Integer, Node> nodes) {
-            if (op != MAX_OP) {       
-                double LowerLimit = this.avgEval-10;
-                Node a=nodes.get(ida), b=nodes.get(idb);
+            if (isCompute()) {       
+                double lowerLimit = this.avgEval-10;
+                List<Node> parents  = Arrays.asList(nodes.get(this.ida), nodes.get(this.idb));
 
-                //give credit to parents /2
-                if (!a.isInput() && a.avgEval < LowerLimit) {
-                    a.avgEval = LowerLimit;
-                    a.backProp(nodes);
+                //Give credit to parents -10pts
+                for (Node n : parents) if (n.isCompute() && n.avgEval < lowerLimit) {
+                    n.avgEval = lowerLimit;
+                    n.backProp(nodes);
                 }
-                if (!b.isInput() && b.avgEval < LowerLimit) {
-                    b.avgEval = LowerLimit;
-                    b.backProp(nodes);
-                }
-
                 //Better parent. remove the child...
-                if (a.avgEval > avgEval || b.avgEval > avgEval) {
-                    avgEval = 0.0;
+                for (Node n : parents) if (n.avgEval > this.avgEval) {
+                    this.avgEval = 0.0;
                 }
             }
         }
         
-        public Node cleanUp(Map<Integer, Node> nodes, double min) {
-            if (avgEval <= min && op != MAX_OP) {
-                return new Node(nodes, id);
+        public Node cleanUp(Integer k, Map<Integer, Node> nodes, double min) {
+            if (isCompute() && avgEval <= min) {
+                return new Node(nodes, k);
             }
-            outs=new ArrayList<>();
+            //Reset outs for next simulation
+            outs = new ArrayList<>();
             evals = new ArrayList<>();
-            avgEval=0.0;
+            avgEval = 0.0;
             return this;
-        }
-
-        private void addToOuts(int out) {
-            if (out < min) min=out;
-            if (out > max) max=out;
-            outs.add(out);
-        }
-
-        private int last() {
-            if (outs.size() == 0) return 0;
-            return outs.get(outs.size()-1);
         }
 
         @Override
         public String toString() {
-            return Arrays.asList(ida, idb, op, "ev:"+avgEval).toString(); //avgEval<1?"_":
+            return Arrays.asList(ida+" "+idb+" "+op, "ev:"+avgEval).toString();
         }
-
         public static double calcAverage(List<Integer> numbers) {
-            // Check if list is empty to avoid division by zero
             if (numbers.isEmpty()) return 0.0;
-            
-            int sum = 0; // Calculate the sum
-            for (int number : numbers) sum += number; 
-
-            // Calculate the average
+            int sum = 0; for (int number : numbers) sum += number; 
             return (double) sum / numbers.size();
         }
-
-        public static double calcMedian(List<Integer> numbers) {
-            if (numbers != null && !numbers.isEmpty()) {
-                Collections.sort(numbers);
-        
-                int size = numbers.size();
-                if (size % 2 == 0) {
-                    // If the size is even, return the average of the two middle elements
-                    int middleIndex1 = size / 2 - 1;
-                    int middleIndex2 = size / 2;
-                    return (numbers.get(middleIndex1) + numbers.get(middleIndex2)) / 2.0;
-                } else {
-                    // If the size is odd, return the middle element
-                    int middleIndex = size / 2;
-                    return numbers.get(middleIndex);
-                }
-            }
-            return 0.0;
+        private int lastOut() {
+            if (outs.isEmpty()) return 0;
+            return outs.get(outs.size()-1);
         }
-
-        public double midValue() {
-            return (double) (max + min) / 2;
-        }
-
-        private boolean isInput() {
+        public boolean isInput() {
             return op == MAX_OP;
+        }
+        public boolean isCompute() {
+            return op != MAX_OP;
         }
 
     }//End of Node
+
+    private static double getMin(Map<Integer, NpSolver.Node> nodes) {
+        double min=100;
+        for(Node n : nodes.values()) {
+            double cur = n.avgEval;
+            if (cur != 0.0 && cur < min) min = cur;
+        }
+        return min;
+    }
+    private static double getMax(Map<Integer, NpSolver.Node> nodes) {
+        double max=0;
+        for(Node n : nodes.values()) {
+            double cur = n.avgEval;
+            if (cur > max) max = cur;
+        }
+        return max;
+    }
 
 }//End of NpSolver
 
