@@ -23,10 +23,10 @@ public class NpSolver {
         }
         
         double min, max=0; int count=0;
-        while (max < 99 && count++ < 1000) {
+        while (max < 99 && count++ < 10000) {
 
             map.clear();
-            for(int j=0; j<1000; j++) map.add(new InOut(NB_INPUT));
+            for(int j=0; j<10000; j++) map.add(new InOut(NB_INPUT));
             //System.out.println("\n### THE MAP - nbTest:" + map.size()); System.out.println(map);
             
             for(InOut io : map) nodes.forEach((k, v) -> v.compute(k, nodes, io));
@@ -49,17 +49,17 @@ public class NpSolver {
     // ***************************************************************************************************************************************************
 
     static class InOut {
-        List<Integer> in;
-        Integer out;
+        List<Value> in;
+        Value out;
         public InOut(int nbInupt){
             in = new ArrayList<>();
             Random random = new Random();
-            for(int i=nbInupt; i>0; i--) in.add(random.nextInt(100)-50);
+            for(int i=nbInupt; i>0; i--) in.add(new Value(random.nextInt(100)-50));
             
             //InputCode
-            int a=in.get(0), b=in.get(1), c=in.get(2);
-            if (a > b) out = a;
-            else out = b + c;
+            int a=in.get(0).number, b=in.get(1).number, c=in.get(2).number;
+            if (a > b) out = new Value(a);
+            else out = new Value(b + c);
         }
         @Override
         public String toString() {
@@ -70,11 +70,86 @@ public class NpSolver {
     // ***************************************************************************************************************************************************
     // ***************************************************************************************************************************************************
 
+    static class Value {
+        Integer number = 0;
+        Boolean bool = false;
+        ValueType type;
+
+        public Value() {
+            type = ValueType.EMPTY;
+        }
+        public Value(Integer val) {
+            type = ValueType.INT;
+            number = val;
+        }
+        public Value(Boolean val) {
+            type = ValueType.BOOL;
+            bool = val;
+        }
+
+        public Value add(Value other) {
+            if (isEmpty()) return other; if (other.isEmpty()) return this;
+            if (bothInt(other)) return new Value(number + other.number);
+            if (bothBool(other)) return new Value(bool || other.bool);
+            return new Value();
+        }
+        public Value minus(Value other) {
+            if (other.isEmpty()) return this;
+            if (bothInt(other)) return new Value(number - other.number);
+            if (bothBool(other)) return new Value(bool != other.bool);
+            return new Value();
+        }
+        public Value mult(Value other) {
+            if (isEmpty() || other.isEmpty()) return new Value();
+            if (bothInt(other)) return new Value(number - other.number);
+            if (bothBool(other)) return new Value(bool != other.bool);
+            if (isInt() && other.isBool() && other.bool) return new Value(number);
+            if (isInt() && other.isBool() && other.bool) return new Value(number);
+
+            return new Value();
+        }
+        public Value inf(Value other) {
+            if (bothInt(other)) return new Value(number < other.number);
+            if (bothBool(other)) return new Value(!bool && other.bool); // False < True
+            return new Value();
+        }
+
+        public Value alternative(Value other) {
+            if (isBool() && !bool) return other;
+            return new Value();
+        }
+
+        private boolean bothInt(Value other) {
+            return isInt() && other.isInt();
+        }
+        private boolean bothBool(Value other) {
+            return isBool() && other.isBool();
+        }
+
+        @Override
+        public String toString() {
+            if (isInt())  return number.toString();
+            if (isBool()) return bool.toString();
+            return "EMPTY";
+        }
+
+        public boolean isInt() { return type == ValueType.INT; }
+        boolean isBool() { return type == ValueType.BOOL; }
+        boolean isEmpty() { return type == ValueType.BOOL; }
+    }//End of InOut
+
+    enum ValueType {
+        INT, BOOL, STRING, EMPTY
+    }
+
+    // ***************************************************************************************************************************************************
+    // ***************************************************************************************************************************************************
+
     static class Node {
-        private static final int MAX_OP = 7;
+        private static final int MAX_OP = 5;
         int ida, idb, op;
         double avgEval=0.0;
-        List<Integer> outs;
+        List<Value> outs;
         List<Integer> evals;
 
         //New Input nodes
@@ -115,24 +190,23 @@ public class NpSolver {
                 outs.add(io.in.get(key));
             }
             else {
-                int a = nodes.get(ida).lastOut(), b = nodes.get(idb).lastOut();
-                if (op == 0) outs.add(a + b);           //A+B
-                if (op == 1) outs.add(a > b  ? a : 0);  //Supp & Inf
-                if (op == 2) outs.add(a < b  ? a : 0);
-                if (op == 3) outs.add(b == 0 ? a : b);  //Replace 0 by
-                if (op == 4) outs.add(a == 0 ? b : a);  
-                if (op == 5) outs.add(a * b);  
-                if (op == 6) outs.add(a - b);
+                Value a = nodes.get(ida).lastOut(), b = nodes.get(idb).lastOut();
+                if (op == 0) outs.add(a.add(b));   //A+B
+                if (op == 1) outs.add(a.inf(b));   //Supp & Inf
+                if (op == 2) outs.add(b.alternative(a));  //Replace 0 by
+                if (op == 3) outs.add(a.alternative(b));
+                if (op == 4) outs.add(a.mult(b));
+                //if (op == 5) outs.add(a.minus(b));
             }
         }
         
         public void evaluate(List<InOut> map) {
             if (isCompute()) {
-                int lout=0, lexp=0;
+                Value lout=new Value(), lexp=new Value();
                 for (int i=0; i<outs.size(); i++) {
-                    int out=outs.get(i);
-                    int exp=map.get(i).out;
-                    int outDif=out-lout, expDif=exp-lexp;
+                    Value out=outs.get(i);
+                    Value exp=map.get(i).out;
+                    Value outDif=out.minus(lout), expDif=exp.minus(lexp);
 
                     evals.add(baseEval(out, exp, outDif, expDif));
 
@@ -142,17 +216,28 @@ public class NpSolver {
             }
         }
 
-        public static int baseEval(int out, int exp, int outDif, int expDif) {
+        public static int baseEval(int valOut, int valExp, int valOutDif, int valExpDif) {
+            return baseEval(new Value(valOut), new Value(valExp), new Value(valOutDif), new Value(valExpDif));
+        }
+        public static int baseEval(Value valOut, Value valExp, Value valOutDif, Value valExpDif) {
+
             int eval = 0;
-            if (outDif==expDif) eval+=10;
-            if (outDif>0 && expDif>0 || outDif<0 && expDif<0) eval+=10;
-            if (out/10==exp/10) eval+=10;
-            if (out/100==exp/100) eval+=10;
-            if (out/1000==exp/1000) eval+=10;
-            if (out>=0 && exp>=0 || out<0 && exp<0) eval+=10;
-            if (out==exp || (out!=0 && exp%out==0)) eval+=10;
-            if (out%2==0 && exp%2==0 || out%2!=0 && exp%2!=0) eval+=10;
-            if (out==exp) eval=100;
+            if (valOut.isBool() && valExp.isBool()) {
+                if (valOut.bool == valExp.bool) eval = 100;
+            }
+            else {
+                int out = valOut.number, exp = valExp.number, outDif=valOutDif.number, expDif=valExpDif.number;
+                if (outDif == expDif) eval += 10;
+                if (outDif > 0 && expDif > 0 || outDif < 0 && expDif < 0) eval += 10;
+                if (out / 10 == exp / 10) eval += 10;
+                if (out / 100 == exp / 100) eval += 10;
+                if (out / 1000 == exp / 1000) eval += 10;
+                if (out >= 0 && exp >= 0 || out < 0 && exp < 0) eval += 10;
+                if (out == exp || (out != 0 && exp % out == 0)) eval += 10;
+                if (out % 2 == 0 && exp % 2 == 0 || out % 2 != 0 && exp % 2 != 0) eval += 10;
+                if (out == exp) eval = 100;
+            }
+
             return eval;
         }
 
@@ -193,8 +278,8 @@ public class NpSolver {
             int sum = 0; for (int number : numbers) sum += number; 
             return (double) sum / numbers.size();
         }
-        private int lastOut() {
-            if (outs.isEmpty()) return 0;
+        private Value lastOut() {
+            if (outs.isEmpty()) return new Value();
             return outs.get(outs.size()-1);
         }
         public boolean isInput() {
