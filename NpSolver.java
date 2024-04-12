@@ -1,56 +1,66 @@
 import java.util.*;
 
-//NpSolver
 public class NpSolver {
-    private static final int MAX_ID = 30;
-    private static final int NB_INPUT = 3;
+    private static final int MAX_ID = 30, NB_INPUT = 3;
     public static void main(String W[]) {
-
+        List<Node> nodes = initNodes();
         List<InOut> map = new ArrayList<>();
-        
-        List<Node> nodes = new ArrayList<>();
-        for(int i=0; i<NB_INPUT; i++) nodes.add(new Node("INPUT", i));
-        for(int i=NB_INPUT; i<MAX_ID; i++) nodes.add(new Node(nodes, i));
-        //System.out.println("\n### NODES - nbNodes:" + nodes.size()); System.out.println(nodes);
+        VerifEvalTest();
 
-        //Verify eval system
-        int eval, oldI=0;
-        for (int i=-100; i<=100; i+=Math.abs(i/10)+1) {
-            eval=Node.baseEval(i, i, i-oldI, i-oldI);
-            if (eval != 100) throw new RuntimeException("WARNING EVAL KO !!! - i:"+i+" ev:"+eval);
-            //System.out.println("i:"+i+" dt:"+(i-oldI)+" ev:"+eval);
-            oldI = i;
-        }
-        
         double min=0, max=0; int count=0;
-        while (min < 75 && count++ < 1000) {
+        while (min < 75 && max < 99 && count++ < 1000) {
+            initMap(map, 1000);
 
-            map.clear();
-            for(int j=0; j<1000; j++) map.add(new InOut(NB_INPUT));
-            //System.out.println("\n### THE MAP - nbTest:" + map.size()); System.out.println(map);
-            
             for(InOut io : map) nodes.forEach(n -> n.compute(io));
             //System.out.println("\n### SIM > OUTS"); System.out.println(nodes);
-            
+
             nodes.forEach(n -> n.evaluate(map));
             //System.out.println("\n### EVALUATE > EVALS"); System.out.println(nodes);
 
             nodes.forEach(n -> n.backProp(nodes));
             System.out.println("\n### AVG EVALS & BACK PROPAGATION"); System.out.println(nodes);
 
-            double min2=getMin(nodes); min = min2; max=getMax(nodes);
-            nodes.forEach(n -> n.cleanUp(min2));
-            nodes.removeIf(n -> n.isCompute() && (!n.asParent() || n.avgEval==0.0));
-            nodes.forEach(n -> n.reset());
-            for (int i=0; i<MAX_ID; i++) {
-                if (i < nodes.size()) nodes.get(i).id = i;
-                else {
-                    nodes.add(new Node(nodes, i));
-                }
-            }
-            System.out.println("\n###"+count+" CLEAN UP - max:" + max + " min:" + min); //System.out.println(nodes);
+            min = getMin(nodes); max = getMax(nodes); cleanUp(nodes, min);
+            System.out.println("\n###"+ count +" CLEAN UP - max:" + max + " min:" + min); //System.out.println(nodes);
         }
         System.out.println();
+    }
+
+    private static void VerifEvalTest() {
+        //Verify eval system
+        int eval, oldI=0;
+        for (int i=-100; i<=100; i+=Math.abs(i/10)+1) {
+            eval= NpSolver.Node.baseEval(i, i, i-oldI, i-oldI);
+            if (eval != 100) throw new RuntimeException("WARNING EVAL KO !!! - i:"+i+" ev:"+eval);
+            //System.out.println("i:"+i+" dt:"+(i-oldI)+" ev:"+eval);
+            oldI = i;
+        }
+    }
+
+    private static List<Node> initNodes() {
+        List<Node> nodes = new ArrayList<>();
+        for(int i=0; i<NB_INPUT; i++) nodes.add(new Node("INPUT", i));
+        for(int i=NB_INPUT; i<MAX_ID; i++) nodes.add(new Node(nodes, i));
+        //System.out.println("\n### NODES - nbNodes:" + nodes.size()); System.out.println(nodes);
+        return nodes;
+    }
+
+    private static void initMap(List<InOut> map, int nb_entry) {
+        map.clear();
+        for(int j=0; j<nb_entry; j++) map.add(new InOut(NB_INPUT));
+        //System.out.println("\n### THE MAP - nbTest:" + map.size()); System.out.println(map);
+    }
+
+    private static void cleanUp(List<Node> nodes, double min) {
+        nodes.forEach(n -> n.cleanUp(min));
+        nodes.removeIf(n -> n.isCompute() && (!n.asParent() || n.avgEval==0.0));
+        nodes.forEach(Node::reset);
+        for (int i=0; i<MAX_ID; i++) {
+            if (i < nodes.size()) nodes.get(i).id = i;
+            else {
+                nodes.add(new Node(nodes, i));
+            }
+        }
     }
 
     // ***************************************************************************************************************************************************
@@ -310,7 +320,7 @@ public class NpSolver {
         public String toString() {
             int ida = nodeA!=null ? nodeA.id:0;
             int idb = nodeB!=null ? nodeB.id:0;
-            return Arrays.asList("id:"+id+" in:"+ida+" "+idb+" "+op+" ev:"+avgEval).toString();
+            return "[id:"+id+" in:"+ida+" "+idb+" "+op+" ev:"+avgEval+"]";
         }
 
         public static double calcAverage(List<Integer> numbers) {
@@ -331,23 +341,20 @@ public class NpSolver {
         public boolean isCompute() {
             return op != MAX_OP;
         }
+        public double getAvgEval() {
+            return avgEval;
+        }
     }//End of Node
 
     private static double getMin(List<Node> nodes) {
-        double min=100;
-        for(Node n : nodes) {
-            double cur = n.avgEval;
-            if (cur != 0.0 && cur < min) min = cur;
-        }
-        return min;
+        return nodes.stream().mapToDouble(Node::getAvgEval)
+                .filter(value -> value != 0.0)
+                .reduce(Double.MAX_VALUE, Double::min);
     }
+
     private static double getMax(List<Node> nodes) {
-        double max=0;
-        for(Node n : nodes) {
-            double cur = n.avgEval;
-            if (cur > max) max = cur;
-        }
-        return max;
+        return nodes.stream().mapToDouble(Node::getAvgEval)
+                .reduce(Double.MIN_VALUE, Double::max);
     }
 
 }//End of NpSolver
