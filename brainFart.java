@@ -13,7 +13,7 @@ public class brainFart {
         String memory = "                              ";  
         String code   = "+++[>>+>+++>++>++++>---->--->-->-[<]<-]>+";
 
-        double loop issue
+        //double loop issue
 
         /*
             " FLOU UIF!SJOH    GSPEPO!TBDRVFU!"

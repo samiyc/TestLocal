@@ -253,6 +253,20 @@ public class NpSolver {
                 avgEval = calcAverage(evals);
             }
         }
+        public void evaluateTest(List<InOut> map) {
+            if (isCompute()) {
+                Value lout=new Value(), lexp=new Value();
+                for (int i=0; i<outs.size(); i++) {
+                    Value out=outs.get(i);
+                    Value exp=map.get(i).out;
+                    Value outDif=out.minus(lout), expDif=exp.minus(lexp);
+
+                    evals.add(baseEval(out, exp, outDif, expDif));
+                    lout=out; lexp=exp;
+                }
+                avgEval = calcAverage(evals);
+            }
+        }
 
         public static int baseEval(int valOut, int valExp, int valOutDif, int valExpDif) {
             return baseEval(new Value(valOut), new Value(valExp), new Value(valOutDif), new Value(valExpDif));
@@ -292,6 +306,22 @@ public class NpSolver {
                 }
                 //Better parent. remove the child...
                 for (Node n : parents) if (n.avgEval > this.avgEval) {
+                    prepareForDelete();
+                }
+            }
+        }
+        public void backPropTest(List<Node> nodes) {
+            if (isCompute() && asParent()) {
+                double lowerLimit = avgEval - 10;
+                List<Node> parents = Arrays.asList(nodeA, nodeB);
+
+                //Give credit to parents
+                for (Node n : parents) if (n.avgEval > avgEval) {
+                    n.avgEval = lowerLimit;
+                    n.backProp(nodes);
+                }
+                //Better parent. remove the child
+                for (Node n : parents) if (n.avgEval > avgEval) {
                     prepareForDelete();
                 }
             }

@@ -100,9 +100,9 @@ public class GabbleScriptReader {
             int vb_needed = this.activeFunction.varBeforeRequired ? 1 : 0;
             int np_needed = this.activeFunction.nbParams;
 
-            if (np < 0 && this.lastOperator != '>') return "";
+            //if (np < 0 && this.lastOperator != '>') return "";
             for (int i=this.todoStack.size() - 1 ; i >= 0; i--) {
-                todoStack
+                //todoStack
             }
 
             return "";

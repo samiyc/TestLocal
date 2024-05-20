@@ -1,34 +1,28 @@
-import java.util.Scanner;
+import java.util.*;
 
-/**
- * ASCII ART
- */
+
 class Solution {
-    public static void main(String args []) {
-        Scanner in= new Scanner(System.in);
-        int length = in.nextInt();
-        int high = in.nextInt();
-        if (in.hasNextLine()) {
-            in.nextLine();
-        }
-        String input = in.nextLine();
-        char[] caInput = input.toUpperCase().toCharArray();
 
-        char[][] map = new char [high][length*27];
-        for(int i=0; i < high; i++) {
-            map[i] = in.nextLine().toCharArray();
-        }
+    public static void main(String args[]) {
+        Scanner in = new Scanner(System.in);
+        int n = in.nextInt(); in.nextLine();
+        String shots = in.nextLine();
+        System.err.println(Arrays.asList("n",n, "shots",shots));
 
-        for(int h=0; h < high; h++) {
-            for(int i=0; i < caInput.length; i++) {
-                int cint = caInput[i] -65;
-                cint = cint < 0 || cint > 26 ? 26 : cint;
-
-                for(int l=cint * length; l < (cint+1) * length; l++) {
-                    System.out.print(map[h][l]);
-                }
+        int w=0, d=0;
+        char prev = 0;
+        for(char c : shots.toCharArray()) {
+            if (c == 'W') {
+                w++; prev=c;
             }
-            System.out.println();
+            if (c == 'D') {
+                d++; prev=c;
+            }
+            if (c == '*' && prev == 'W') w += 2;
+            if (c == '*' && prev == 'D') d += 2;
         }
+        System.out.println((int)Math.min(d, w));
     }
+
 }
+
